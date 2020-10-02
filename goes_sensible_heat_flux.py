@@ -21,11 +21,11 @@ p_air = 1013.25 # Atmospheric pressure (hPa), assumption - weather station input
 u_r = 1         # wind speed at reference height (m/s), assumption - weather station input
 
 ### Model inputs
-T_lst = 350     # land surface temperature (LST) (K), assumption - Hrisko model input
+T_lst = 300     # land surface temperature (LST) (K), assumption - Hrisko model input
 T_air = 285     # air temperature at reference height (K), assumption - Hrisko model input
 
 ### Initial conditions
-L = 1000       # Initial condition for Obukhov length
+L = 100       # Initial condition for Obukhov length
 z_0m = .1        # Initial condition for aerodynamic roughness length
 q_h = 10        # Initial condition for sensible heat flux
 
@@ -42,10 +42,18 @@ theta_r = theta(T_air)
 # h_0 = vegetation height (m)
 d_0 = math.exp(0.98*math.pow(math.log(h_0), 2)-0.15)
 
+### Constant calculation as a function of Ri, ref. Kim et al. (2019), Eqn. 6
+# x = math.pow((1 - 15*(z_r - d_0)/L), 0.25)
+### Alternate calculation of constant as f(Ri), ref. Pearlmutter et al. (2004), Eqn. 4
+T = (T_lst-T_air)/2 # Assume temperature is mean of ref. ht. temperature and LST
+Ri = g*((T_lst-T_air)/z_r)/(T*(u_0-u_r)/z_r)
+x = math.pow((1 - 16*Ri), 0.25)
+
 err_list = []
 L_list = []
 err = 2 # Assume an initial value for the error
 
+# Set convergence criteria at 1%
 conv_crit = 0.01
 print('Error: %.2f' % err)
 
@@ -58,14 +66,7 @@ while err > conv_crit:
     
     print('Iteration #%d' % i)
     print('z_r: %.2f  |  d_0: %.2f  |  L: %.2f' % (z_r, d_0, L))
-    
-    ### Constant calculation as a function of Ri, ref. Kim et al. (2019), Eqn. 6
-    x = math.pow((1 - 15*(z_r - d_0)/L), 0.25)
-    ### Alternate calculation of constant as f(Ri), ref. Pearlmutter et al. (2004), Eqn. 4
-    # T = (T_lst-T_air)/2 # Assume temperature is mean of ref. ht. temperature and LST
-    # Ri = g*((T_lst-T_air)/z_r)/(T*(u_0-u_r)/z_r)
-    # x = math.pow((1 - 16*Ri), 0.25)
-    
+        
     ### Stability similarity functions, ref. Kim et al. (2019), Eqn. 5, 6 and Garratt, Ch 3.3
     if (z_r/L) >= 0:
         psi_m = -5*(z_r - d_0)/L
@@ -109,24 +110,29 @@ while err > conv_crit:
     err_list.append(err)
     L_list.append(L)
     
-    print('L: %.4f  |  L_new: %.4f m  |  Error: %.4f' % (L, L_new, err))
-       
+    ### Print iteration results
+    print('L: %.4f  |  L_new: %.4f m  |  Error: %.4f  |  Previous: %.4f' % (L, L_new, err_list[i], err_list[i-1]))
+    
+    ### Obukhov length re-calculation
+    # Initial condition
     if i == 0:
         L = L_new
     else:
         if (err_list[i] < err_list[i-1]):
-            L = L + L_new*math.pow(err, 2)
-            print("subtracting")
+            L = L - L*abs(err_list[i]-err_list[i-1])
         else:
-            L = L - L_new*math.pow(err, 2)
-            print("adding")
-    
-    if i > 50:
-        break
+            L = L + L*abs(err_list[i]-err_list[i-1])
     
     iter_list.append(i)
-    i += 1    
     
+    # Cold break at i = 51 to prevent run-on solution
+    if i > 100:
+        break
+    else:
+        i += 1    
+    
+### Calculate time elapsed for iterative solution
+# CONUS Target: 1 min, 
 elapsed_time = time.time() - start_time
 
 ### Main function defintion
