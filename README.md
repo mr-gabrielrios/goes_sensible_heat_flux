@@ -1,4 +1,4 @@
-# GOES Sensible Heat Flux
+# GOES Sensible Heat Flux Algorithm
 
 The objective of this package is to provide an algorithm for calculating the sensible heat flux using GOES satellite data as a base input, processed through [Josh Hrisko's](https://github.com/makerportal) models for land surface temperature (LST) and air temperature at a height of 2m from the elevation of the reference location.
 
