@@ -36,9 +36,9 @@ T_lst = 300     # Land surface temperature (LST) (K), assumption - Hrisko model 
 T_air = 290     # Air temperature at reference height (K), assumption - Hrisko model input
 
 ### 3. Initial conditions
-L = 1e6         # Initial condition for Obukhov length
-u_star = u_0    # Initial condition for friction velocity
-z_0m = .1      # Initial condition for aerodynamic roughness length
+L = 1e7         # Initial condition for Obukhov length
+u_star = 1    # Initial condition for friction velocity
+z_0m = 0.1      # Initial condition for aerodynamic roughness length
 q_h = 10        # Initial condition for sensible heat flux
 
 ### 4. Calculate secondary parameters
@@ -66,12 +66,14 @@ x = math.pow((1 - 15*(z_r - d_0)/L), 0.25)
 ## Assume initial values for the errors
 L_err = 1
 z_0m_err = 1
+u_star_err = 1
 i = 0
 
 ## Store iteration history of iteratively-solved variables
 L_err_list = [L_err]
 L_list = [L]
 z_0m_err_list = [z_0m_err]
+u_star_err_list = [u_star_err]
 u_star_list = [u_star]
 z_0m_list = [z_0m]
 iter_list = [i]
@@ -96,9 +98,10 @@ while L_err > conv_crit:
             - 2*math.atan(x) + math.pi/2
         psi_h = 2*math.log((1 + math.pow(x, 2))/2) # Potential source of inaccuracy/error
     
-    ## Write nested loop to simult. solve u_star and z_0m
-    j = 1 # Nested loop iterand    
-    while abs(z_0m_err) > conv_crit:
+    ### Inner loop to simult. solve u_star and z_0m
+    j = 1 # Nested loop iterand   
+    ## Initialize outer while loop
+    while (abs(z_0m_err) + abs(u_star_err)) > conv_crit:
         print('Sub-iteration #%d' % j)
         
         ## Friction velocity calculation, ref. Kim et al. (2019), Eqn. 7
@@ -117,23 +120,25 @@ while L_err > conv_crit:
         # print(*z_0m_list, sep = ", ")  
         
         # Calculate and print z_0m error
-        z_0m_err = abs((z_0m_list[j] - z_0m_list[j-1])/z_0m_list[j-1])  
-        print('z_0m error: %.4f' % z_0m_err)
+        z_0m_err = abs((z_0m_list[j] - z_0m_list[j-1])/z_0m_list[j-1]) 
+        u_star_err = abs((u_star_list[j] - u_star_list[j-1])/u_star_list[j-1])
+        print('z_0m error: %.4f | u_star error: %.4f' % (z_0m_err, u_star_err))
         
         # Corrective calculation
-        z_0m = z_0m - z_0m*z_0m_err        
+        z_0m = z_0m - z_0m*z_0m_err
+        u_star = u_star - u_star*u_star_err           
         
         # Limit nested loop to 50 iterations
-        if j < 50:
+        if j < 200:
             j += 1
         else:
             break
         
         # print("u*: %.4f; z_0m: %.4f; z_0m_err: %.4f" % (u_star, z_0m, z_0m_err))
-        
-    # Print final z_0m value
-    print('z_0m = %.4f' % z_0m)    
     
+    # Print final z_0m value
+    print('z_0m = %.4f | u_star = %.4f' % (z_0m, u_star))    
+    # break
     ## Exchange coefficient calculation, ref. Kim et al. (2019), Eqn. 2
     # d_0 = zero-plane displacement height (m)
     # z_0m = aerodynamic roughness length (m)
@@ -179,7 +184,7 @@ while L_err > conv_crit:
 ## Calculate time elapsed for iterative solution
 elapsed_time = time.time() - start_time
 
-## Main function defintion
+## Main function definition
 def main():
     ### Print statements
     print('Sensible heat flux for selected pixel is: %.2f W/m^2' % q_h)
