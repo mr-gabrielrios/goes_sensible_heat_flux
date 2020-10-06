@@ -18,5 +18,4 @@ def plotter(iter_list, L_list, err_list):
     plt.title('Convergence statistics')
     plt.xlabel('Iteration #')
     plt.ylabel('L (m), Error (%)')
-    plt.legend(['L (m)', 'Error (%)'])
     plt.show()
