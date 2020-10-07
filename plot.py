@@ -2,6 +2,7 @@
 # The objective of this script is to generate plots for results from goes_sensible_heat_flux.py
 
 ### Imports
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -33,16 +34,24 @@ def plotter(i, dataset_names, *args, **kwargs):
         ax1.plot(np.linspace(0, i, i), arg, label=dataset_names[n])   
         n += 1
         
+    # Initialize secondary axis
     ax2 = ax1.twinx()
     ax2.tick_params(axis='y')
     ax2.set_ylabel('Error')
+    ax2.set_yscale('log')
+    ax2._get_lines.prop_cycler = ax1._get_lines.prop_cycler # Ensures color cycling accounts for secondary axis
     # Loop to plot all error value data in **kwargs
     for val in kwargs.values():
         ax2.plot(np.linspace(0, i, i), val, label=dataset_names[n])
         n += 1        
     
+    
     # Re-group each y-axis label, combine into one legens
     lines = ax1.get_lines() + ax2.get_lines()
-    ax1.legend(lines, [line.get_label() for line in lines])
-        
+    ax1.legend(lines, [line.get_label() for line in lines], loc='best')
+    
+    font = {'family' : 'sans-serif',
+            'size': 12}
+    mpl.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
+    
     plt.show()
