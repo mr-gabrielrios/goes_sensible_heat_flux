@@ -41,8 +41,11 @@ def plotter(i, dataset_names, *args, **kwargs):
     ax2.set_yscale('log')
     ax2._get_lines.prop_cycler = ax1._get_lines.prop_cycler # Ensures color cycling accounts for secondary axis
     # Loop to plot all error value data in **kwargs
-    for val in kwargs.values():
-        ax2.plot(np.linspace(0, i, i), val, label=dataset_names[n])
+    for key, val in kwargs.items():
+        if key == 'err_data':
+            ax2.plot(np.linspace(0, i, i), val, label=dataset_names[n])
+        elif key == 'length_plot' and val == True:
+            ax1.set_ylim([-100, 100])
         n += 1        
     
     
