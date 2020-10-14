@@ -41,8 +41,8 @@ def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
     q_h = 1      
     psi_m = 0      
     psi_h = 0
-    C_h = 1   
-    C_d = 1   
+    C_h = 1
+    C_d = 1
     
     ### 4. Calculate secondary parameters
     
@@ -127,19 +127,27 @@ def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
         ## Thermal roughness length calculation
         # Zilitinkevich relationship constant, per Chen and Zhang (2009)
         C_zil = math.pow(10, -0.4*h_0)
-        # Kinematic viscosity of air at 290 K
-        nu = 1.478e-5
+        # Dynamic viscosity calculation based on the Sutherland Equation
+        mu = (1.458e-6)*math.pow(T_air, 3/2)/(T_air + 110.4)
+        # Kinematic viscosity of air
+        nu = mu/rho
         # Roughness Reynolds number
         Re_t = z_0m*u_star/nu
-        
+        # Thermal roughness length
         z_t = z_0m*math.exp(-vk*C_zil*math.sqrt(Re_t))    
             
         ## Heat transfer coefficient for heat flux, or Stanton number
         val_dict['C_h'].append(math.pow(vk,2)/ \
             ((math.log(z/z_0m)-psi_m*zeta)*(math.log(z/z_t)-psi_h*zeta)))
-        
+        # On the first iteration, make the initial condition C_h equal to its first calculation
+        if i == 1:
+            C_h = val_dict['C_h'][-1]
+            
         ## Drag coefficient for momentum flux
         val_dict['C_d'].append(math.pow(vk,2)/ math.pow((math.log(z/z_0m)-psi_m*zeta), 2))
+        # On the first iteration, make the initial condition C_d equal to its first calculation
+        if i == 1:
+            C_d = val_dict['C_d'][-1]
         
         ## Friction velocity
         # Ref. Launiainen et al. (1990), Eqn. A7
@@ -179,7 +187,7 @@ def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
 def main():
     ### Print statements
     z_r = 94.79 
-    h_0 = 92.79
+    h_0 = 34.4
     p_air = 1013.25 
     u_r = 2.24 # Test case, Upper East Side, 10:45 AM EST
     T_lst = 292.5 # Test case, Upper East Side, 10:45 AM EST
