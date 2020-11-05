@@ -35,6 +35,7 @@ data = pd.read_table(data_url)
 # Read data for air temperature, T_lst, and wind speed, u
 T_list = []
 u_list = []
+date_list = []
 # Air temperature regex: string of 6 characters "(0-9)(0-9)/(0-9)(0-9)" bounded by 2 spaces
 T_pattern = r"\s\d\d[^a-z0-9\s]\d\d\s" 
 # Wind speed regex: string of 6 characters "(0-9)(0-9)/(0-9)(0-9)" bounded by 2 spaces
@@ -43,12 +44,12 @@ u_pattern = r"\d\d[K][T]\s\d"
 
 t = time.time()
 for row in data.iloc[:, 0]:
-    if re.findall(T_pattern, row):
+    if re.findall(T_pattern, row) and re.findall(u_pattern, row):
         T_lst_str = re.findall(T_pattern, row)[0]
         T_list.append(T_lst_str[1:3])
-    if re.findall(u_pattern, row):
         u_str = re.findall(u_pattern, row)[0]
         u_list.append(u_str[0:2])
+        date_list.append(int(row[13:25]))
         
 T_list = list(map(int, T_list))
 T_list = [CtoF(T) for T in T_list]
@@ -56,4 +57,4 @@ u_list = list(map(int, u_list))
 
 print('Time elapsed for iteration: %.3f' % (time.time()-t))
 
-# plt.plot(T_list)
+plt.plot(date_list, T_list)
