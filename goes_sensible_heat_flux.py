@@ -17,21 +17,24 @@
 ### 0. Imports
 import math
 import time
+import pandas as pd
+import matplotlib.pyplot as plt
+import asos_data_reader as asos
 
 ### 1. Constants
-rho = 1.225
-c_p = 1006   
-vk = 0.4
-g = 9.81
-R = 287.05 
+rho = 1.225     # Air density at station (kg/m^3) - note: p = rho*R*T
+c_p = 1006      # Specific heat capacity of air at station (J/kg-K)
+vk = 0.4        # Von Karman constant
+g = 9.81        # Gravitational acceleration (m/s^2)
+R = 287.05      # Gas constant
 
 ### 2. Dynamic inputs
-z_r = 10
-h_0 = 1
-p_air = 1013.25 
-u_r = 1.5
-T_lst = 295
-T_air = 290
+# z_r = 10        # Roughness height
+# h_0 = 1         # Elevation
+# p_air = 1013.25 # Atmospheric pressure at station (hPa)
+# u_r = 1.5       # Wind speed at station (m/s)
+# T_lst = 295     # Land surface temperature (K)
+# T_air = 290     # 2m air temperature at station (K)
 
 def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
 
@@ -43,6 +46,10 @@ def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
     psi_h = 0
     C_h = 1
     C_d = 1
+    
+    # To prevent division-by-zero error for Obukhov length (L) calculation
+    if u_r == 0:
+        u_r = 0.001
     
     ### 4. Calculate secondary parameters
     
@@ -58,15 +65,15 @@ def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
             p += h_i*s_i
         return (0.25*p/S_T)
     
-    # Roughness height for Manhattan
+    # Roughness height for Brooklyn, Flatbush area 
+    # with 2km square pixel centered at Brooklyn College
     # Assume that:
-    #   average building height is 34.4m (~14 stories)
-    #   average block size is 21920 m^2 (80 x 274 m)
-    #   number of blocks is 2872
-    #   land area is 59.1 km^2
+    #   average building height is 21.5m (~5 stories)
+    #   average block size is 21600 m^2 (80 x 270 m)
+    #   number of blocks is 200 (based on street grid within selected pixel)
+    #   land area is 4 km^2 (based on GOES-16 2km resolution)
     #   all buildings are of equal height          
-    z_0m = roughness_height(34.4, 21920, 2872, 5.91e7) 
-     
+    z_0m = roughness_height(h_0, 21600, 200, 4e6) 
         
     ## Potential temperature calculation
     def theta(T_abs):
@@ -152,11 +159,15 @@ def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
         ## Friction velocity
         # Ref. Launiainen et al. (1990), Eqn. A7
         val_dict['u_star'].append(math.sqrt(C_d*u_r))
+        # print("u*: %.3f" % u_star)
         
+        print("rho: %.3f | c_p: %.3f | C_h: %.3f | u_r: %.3f | (theta(T_lst)-theta(T_air)): %.3f" % \
+              (rho, c_p, C_h, u_r, theta(T_lst)-theta(T_air)))
         ## Sensible heat flux
         # Ref. Launiainen et al. (1990), Eqn. 5
         val_dict['q_h'].append(rho*c_p*C_h*u_r*(theta(T_lst)-theta(T_air)))
         
+        # print(q_h)
         ## Obukhov length (ignoring latent heat flux)
         # Ref. Launiainen et al. (A10), derivation performed by Rios
         val_dict['L'].append(-rho*c_p*math.pow(u_star,3)*0.5*(theta(T_lst)+theta(T_air))/(vk*g*q_h))
@@ -164,7 +175,7 @@ def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
         # Calculate error between current and previous iteration
         L_err = abs((val_dict['L'][-1]-val_dict['L'][-2])/val_dict['L'][-2])
         err_dict['L'].append(L_err)
-        print('L(i-1): %.3f; L(i): %.3f; Error: %.6f%%' % (val_dict['L'][-2], val_dict['L'][-1], (L_err*100)))
+        # print('L(i-1): %.3f; L(i): %.3f; Error: %.6f%%' % (val_dict['L'][-2], val_dict['L'][-1], (L_err*100)))
         
         # Control logic to ensure number of iterations is not exceeded
         # Recalculate each parameter
@@ -179,25 +190,67 @@ def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
             print('Model did not converge.')
             break
     t_elapsed = time.time() - t_start
-    print('Time elapsed: %.2f' % t_elapsed)
+    # print('Time elapsed: %.2f' % t_elapsed)
             
     return C_h, C_d, L, z_0m, zeta, q_h
 
-## Main function definition
+# def main():
+    # ### Print statements
+    # z_r = 33.2 
+    # h_0 = 21.3
+    # p_air = 1013.25 
+    # u_r = 5.66 # Test case, Upper East Side, 10:45 AM EST
+    # T_lst = 286 # Test case, Upper East Side, 10:45 AM EST
+    # T_air = 288.7 # Test case, Upper East Side, 10:45 AM EST
+    # [C_h, C_d, L, z_0m, zeta, q_h] = q_sens(z_r, h_0, p_air, u_r, T_lst, T_air)
+    # print('Sensible heat flux for selected pixel is: %.4f W/m^2' % q_h)
+    # print('Stability parameter for the selected pixel is: %.4f' % zeta)
+    # print('Obukhov length for the selected pixel is: %.4f m' % L)
+    # print('Roughness length for the selected pixel is: %.4f m' % z_0m)
+    # print('Heat transfer coefficient for the selected pixel is: %.4f' % C_h)
+
+# Main function definition
 def main():
-    ### Print statements
-    z_r = 94.79 
-    h_0 = 34.4
+    
+    ## Begin 'single data point' method for troubleshooting purposes
+    z_r = 33.2      # Height above sea level for Brooklyn MesoNET site
+    h_0 = 21.5      # Based on assumed average height of 5 story buildings in Flatbush
     p_air = 1013.25 
-    u_r = 2.24 # Test case, Upper East Side, 10:45 AM EST
-    T_lst = 292.5 # Test case, Upper East Side, 10:45 AM EST
-    T_air = 288.7 # Test case, Upper East Side, 10:45 AM EST
+    T_lst = 300   # Test case
+    # Data point JFK20190601000010306 from 64010KJFK201906.dat
+    u_r = 1.78
+    T_air = 288.15 # Test case, Upper East Side, 10:45 AM EST
     [C_h, C_d, L, z_0m, zeta, q_h] = q_sens(z_r, h_0, p_air, u_r, T_lst, T_air)
+    
+    ## End 'single data point' method for troubleshooting purposes
+    
+    ## Begin iterative method using ASOS data
+    
+    # df = asos.data_read(201906010000, 201906062359)    # Test case, Upper East Side, 10:45 AM EST
+    # u_r = df['u_r']
+    # T_air = df['T_air']   # Test case, Upper East Side, 10:45 AM EST
+    
+    # u_list = []
+    # q_h_list = []
+    # for index, row in df.iterrows():
+    #     u_r = row['u_r']
+    #     T_air = row['T_air']
+    #     [C_h, C_d, L, z_0m, zeta, q_h] = q_sens(z_r, h_0, p_air, u_r, T_lst, T_air)
+    #     u_list.append(u_r)
+    #     q_h_list.append(q_h)
+        
+    # fig, ax = plt.subplots(figsize=(8, 6))
+    # plt.plot(df['date'], q_h_list)
+    # plt.xticks(rotation=45)
+    # print(df)
+
+    ## End iterative method
+            
     print('Sensible heat flux for selected pixel is: %.4f W/m^2' % q_h)
     print('Stability parameter for the selected pixel is: %.4f' % zeta)
     print('Obukhov length for the selected pixel is: %.4f m' % L)
     print('Roughness length for the selected pixel is: %.4f m' % z_0m)
     print('Heat transfer coefficient for the selected pixel is: %.4f' % C_h)
-
+    
 if __name__ == "__main__":
     main() 

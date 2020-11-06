@@ -1,60 +1,93 @@
 ### Objective
 # The objective of this script is to read relevant parameters from observation data logs from NOAA ASOS stations.
 
+### Inputs: 
+# Station name (str)
+# Start date (int)
+# End date (int)
+### Outputs:
+# Pandas DataFrame with air temperature (T_air, K), wind speed (u, m/s), and date data
+
 # Status: currently testing single cases to develop generalized algorithm.
 
+##########################################################################################
+# Imports
 import pandas as pd
-import matplotlib.pyplot as plt
 import re
 import time
+from datetime import datetime 
 
-# Brooklyn flux data
-# Select data for JFK for June 2019 as a test case
-data_url = "ftp://ftp.ncdc.noaa.gov/pub/data/asos-fivemin/6401-2019/64010KJFK201906.dat"
+# Start script timer
+t = time.time()
 
-# Import data to dataframe. Note that column 6 is wind information, column 9 is air temperature
-data = pd.read_table(data_url, sep="\s+", usecols=[1, 6, 9])
-
-# Convert Celsius to Fahrenheit
-def CtoF(T):
-    return (T*9/5) + 32
-
+### Auxiliary methods for unit conversion
+# Convert Celsius to Kelvin
+def CtoK(T):
+    return T + 273.15
 # Convert knots to meters per second
 def KTtoMS(u):
     return u*0.51444
 
-data.iloc[:,0] = data.iloc[:,0].str[3:15]
-data.iloc[:,1] = data.iloc[:,1].str[3:5]
-data.iloc[:,2] = data.iloc[:,2].str[0:2]
+#############################################################################
 
-########## Method 2
+def data_read(start_date, end_date):
 
-# Import data to dataframe. Note that column 6 is wind information, column 9 is air temperature
-data = pd.read_table(data_url)
-
-# Read data for air temperature, T_lst, and wind speed, u
-T_list = []
-u_list = []
-date_list = []
-# Air temperature regex: string of 6 characters "(0-9)(0-9)/(0-9)(0-9)" bounded by 2 spaces
-T_pattern = r"\s\d\d[^a-z0-9\s]\d\d\s" 
-# Wind speed regex: string of 6 characters "(0-9)(0-9)/(0-9)(0-9)" bounded by 2 spaces
-# Note: if gusts exist, the gust becomes the effective wind speed
-u_pattern = r"\d\d[K][T]\s\d"
-
-t = time.time()
-for row in data.iloc[:, 0]:
-    if re.findall(T_pattern, row) and re.findall(u_pattern, row):
-        T_lst_str = re.findall(T_pattern, row)[0]
-        T_list.append(T_lst_str[1:3])
-        u_str = re.findall(u_pattern, row)[0]
-        u_list.append(u_str[0:2])
-        date_list.append(int(row[13:25]))
+    # Brooklyn flux data
+    # Select data for JFK for June 2019 as a test case
+    # TO DO: write algorithm to based FTP data access based on start and end dates specified
+    data_url = "ftp://ftp.ncdc.noaa.gov/pub/data/asos-fivemin/6401-2019/64010KJFK201906.dat"
         
-T_list = list(map(int, T_list))
-T_list = [CtoF(T) for T in T_list]
-u_list = list(map(int, u_list))
+    # Import data to dataframe. Note that column 6 is wind information, column 9 is air temperature
+    data = pd.read_table(data_url)
+    # Date range where element 0 is start data and 1 is end date
+    # Date format: YYYYMMDDHHMM
+    date_range = [start_date, end_date]
+    # Read data for air temperature, T_lst, and wind speed, u
+    date_list = []
+    station_list = []
+    T_list = []
+    u_list = []
+    
+    ## Regex patterns for data mining through the .dat file(s)
+    # Air temperature regex: string of 6 characters "(0-9)(0-9)/(0-9)(0-9)" bounded by 2 spaces
+    T_pattern = r"\s\d\d[^a-z0-9\s]\d\d\s" 
+    # Wind speed regex: string of 6 characters "(0-9)(0-9)KT " bounded by 2 numbers and a space
+    # Note: if gusts exist, the gust becomes the effective wind speed
+    u_pattern = r"\d\d[K][T]\s\d"
+    # Sea level pressure: string of 6 characters "(0-9)(0-9)/(0-9)(0-9)" bounded by space and number
+    slp_pattern = r"\d\d[K][T]\s\d"
+    
+    # Iterate through DataFrame and filter out results
+    for row in data.iloc[::12, 0]:
+        print(row)
+        if date_range[0] <= int(row[13:25]) <= date_range[1]:
+            if re.findall(T_pattern, row) and re.findall(u_pattern, row):
+                T_lst_str = re.findall(T_pattern, row)[0]
+                T_list.append(T_lst_str[1:3])
+                u_str = re.findall(u_pattern, row)[0]
+                u_list.append(u_str[0:2])
+                station_list.append(row[5:9])
+                date_list.append(datetime.strptime(row[13:25], '%Y%m%d%H%M'))
+    
+    # Perform type conversions for further data manipulation
+    T_list = list(map(int, T_list))
+    T_list = [CtoK(T) for T in T_list]
+    u_list = list(map(int, u_list))
+    u_list = [KTtoMS(u) for u in u_list]
+    
+    # Add data to output DataFrame
+    df = pd.DataFrame()
+    df['station'] = station_list
+    df['date'] = date_list
+    df['T_air'] = T_list
+    df['u_r'] = u_list
+    return df
 
-print('Time elapsed for iteration: %.3f' % (time.time()-t))
+def main(start_date, end_date):
+    data_read(start_date, end_date)
+    
+if __name__ == "__main__":
+    main()
 
-plt.plot(date_list, T_list)
+# Print elapsed time for script function
+# print('Time elapsed for iteration: %.3f' % (time.time()-t))
