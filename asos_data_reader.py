@@ -1,3 +1,5 @@
+### asos_data_processing branch
+
 ### Objective
 # The objective of this script is to read relevant parameters from observation data logs from NOAA ASOS stations.
 
@@ -59,7 +61,6 @@ def data_read(start_date, end_date):
     
     # Iterate through DataFrame and filter out results
     for row in data.iloc[::12, 0]:
-        print(row)
         if date_range[0] <= int(row[13:25]) <= date_range[1]:
             if re.findall(T_pattern, row) and re.findall(u_pattern, row):
                 T_lst_str = re.findall(T_pattern, row)[0]
