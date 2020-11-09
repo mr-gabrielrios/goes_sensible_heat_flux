@@ -24,6 +24,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import asos_data_reader as asos
 import mesonet_reader as meso
+# import sandbox as sdbx
 
 ### 1. Constants
 rho = 1.225     # Air density at station (kg/m^3) - note: p = rho*R*T
@@ -41,7 +42,7 @@ p_air = 1013.25 # Atmospheric pressure at station (hPa)
 # T_air = 290     # 2m air temperature at station (K)
 
 def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
-
+    print('T_lst: %.3f | T_air: %.3f' % (T_lst, T_air))
     L = 1e15
     u_star = 1
     q_h = 1      
@@ -101,7 +102,10 @@ def q_sens(z_r, h_0, p_air, u_r, T_lst, T_air):
         zeta = z/L
         # print('Stability parameter: %.4f' % zeta)
         
-        x = math.pow(1-16*zeta, 0.25)
+        if zeta < 1/16:
+            x = math.pow(1-16*zeta, 0.25)
+        else:
+            x = -math.pow(abs(1-16*zeta), 0.25)
         
         if zeta < 0:
             psi_m = 2*np.log((1+x)/2) + np.log((1+math.pow(x,2))/2) - 2*math.atan(x) + math.pi/2
@@ -199,36 +203,47 @@ def main():
     
     ## Begin iterative method using ASOS data
     
-    df = asos.data_read(201906010000, 201906092359)    # Test case, Upper East Side, 10:45 AM EST
+    df = asos.data_read(201906140000, 201906142359)    # Test case, Upper East Side, 10:45 AM EST
+    
+    # lsts = sdbx.lst_grab()
     u_r = df['u_r']
     T_air = df['T_air']   # Test case, Upper East Side, 10:45 AM EST
-    
-    T_lst = 310   # Test case
+        
+    # T_lst = 310   # Test case
     z_r = 33.2      # Height above sea level for Brooklyn MesoNET site
-    h_0 = 21.5      # Based on assumed average height of 5 story buildings in Flatbush
+    h_0 = 7.5       # Based on Index 2 (Hi-Density Residential) from WRF/URBPARAM.TBL (https://github.com/wrf-model/WRF/blob/master/run/URBPARM.TBL)
     u_list = []
     q_h_list = []
+    df['lst'] = d['box_lst']
+    df['T_lst'] = [287, 286, 286, 285, 285, 283, 284, 286, 290, 293, 295, 296, 297, np.nan, 297, 299, 297, 295, 293, 291, 288, 286, 286, 285] # Rudimentar
+    df['T_air'] = [283, 283, 281, 281, 280, 281, 282, 283, 285, 288, 290, 292, 294, np.nan, 294, 295, 292, 290, 287, 285, 284, 284, 283, 283]
+    z_list = []
+    
+    for index, row in df.iterrows():
+        print(row)
+        
     for index, row in df.iterrows():
         u_r = row['u_r']
         T_air = row['T_air']
+        T_lst = row['T_lst']
         [C_h, C_d, L, z_0m, zeta, q_h] = q_sens(z_r, h_0, p_air, u_r, T_lst, T_air)
         u_list.append(u_r)
         q_h_list.append(q_h)
+        z_list.append(zeta)
     
-    flux_obs = meso.csv_reader(20190601, 20190609, "data")
-    
-    print(df['date'])
-    print(flux_obs['datetime'])
-    
+    flux_obs = meso.csv_reader(20190614, 20190615, "data")
+        
     fig, ax = plt.subplots(figsize=(8, 6))
+    # plt.plot(df['date'], z_list)
     plt.plot(df['date'], q_h_list)
+    # plt.plot(df['date'], df['lst'])
     plt.plot(flux_obs['datetime'], flux_obs['H'])
     # ax.set_xticks(ax.get_xticks()[::24])
     plt.xticks(rotation=45)
     plt.title("Sensible heat flux, Brooklyn College")
-    plt.ylabel("Sensible heat flux (Q_h) [W/m^2]")
+    plt.ylabel("Q_h [W/m^2]")
     plt.legend(["Model", "Observed"])
-    print(df)
+    # print(df)
 
     ## End iterative method
     

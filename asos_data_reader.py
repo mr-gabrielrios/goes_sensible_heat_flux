@@ -54,10 +54,12 @@ def data_read(start_date, end_date):
     # Air temperature regex: string of 6 characters "(0-9)(0-9)/(0-9)(0-9)" bounded by 2 spaces
     T_pattern = r"\s\d\d[^a-z0-9\s]\d\d\s" 
     # Wind speed regex: string of 6 characters "(0-9)(0-9)KT " bounded by 2 numbers and a space
-    # Note: if gusts exist, the gust becomes the effective wind speed
-    u_pattern = r"\d\d[K][T]\s\d"
+    # Note: This definition ignores gusts
+    u_pattern = r"\d[Z]\s\d\d\d\d\d\D"
+    # Note: This definition allows the gust becomes the effective wind speed
+    # u_pattern = r"\d\d[K][T]\s\d"
     # Sea level pressure: string of 6 characters "(0-9)(0-9)/(0-9)(0-9)" bounded by space and number
-    slp_pattern = r"\d\d[K][T]\s\d"
+    # slp_pattern = r"\d\d[K][T]\s\d"
     
     # Iterate through DataFrame and filter out results
     for row in data.iloc[::12, 0]:
@@ -66,7 +68,8 @@ def data_read(start_date, end_date):
                 T_lst_str = re.findall(T_pattern, row)[0]
                 T_list.append(T_lst_str[1:3])
                 u_str = re.findall(u_pattern, row)[0]
-                u_list.append(u_str[0:2])
+                u_list.append(u_str[6:8]) # If gusts not accounted for, use this
+                # u_list.append(u_str[0:2]) # If gusts accounted for, use this
                 station_list.append(row[5:9])
                 date_list.append(datetime.strptime(row[13:25], '%Y%m%d%H%M'))
     

@@ -22,7 +22,7 @@ The algorithm in this script is loosely based on Launiainen et al. (1995) ([link
 * No bounds on parameter values, allowing for this script to go haywire
 
 ### Dependencies
-* (`math`)
-* (`time`)
+* `math`
+* `time`
 
 Feel free to point anything out to me that you feel can be improved upon! I'm always looking to improve my programming form, adopt best practices, or try new algorithms. Thanks!

@@ -1,9 +1,10 @@
-### Objective:/
+### Objective:
 # Read data from NYS Mesonet sites
 
 import pandas as pd
 import os
 from datetime import datetime
+from datetime import timedelta
 
 # Inputs for troubleshooting
 # start_date = 20190601
@@ -25,7 +26,7 @@ def csv_reader(start_date, end_date, data_dir):
     # Iterate through sorted file list and extract data within date range
     for file in file_list:        
         if start_date <= int(os.path.splitext(file)[0][0:8]) <= end_date:
-            print(os.path.splitext(file)[0][0:8])
+            # print(os.path.splitext(file)[0][0:8])
             filename = data_dir + "/" + file
             data_list.append(pd.read_csv(filename, usecols=data_cols))
             
@@ -40,6 +41,7 @@ def csv_reader(start_date, end_date, data_dir):
     
     # Re-cast datetime strings as datetime objects
     data['datetime'] = pd.to_datetime(data['datetime'])
+    data['datetime'] = [i - timedelta(hours=5) for i in data['datetime']]
 
     return data
         
