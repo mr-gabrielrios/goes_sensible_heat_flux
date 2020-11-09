@@ -3,7 +3,7 @@
 The objective of this document is to catalogue the program flow of the sensible heat flux package.
 
 ## Output(s)
-* Sensible heat flux `Q<sub>H</sub`
+* Sensible heat flux ```{ Q<sub>H</sub> }```
 
 ## Input(s)
 * Land surface/skin temperature (LST) `T`<sub>`LST`</sub>
