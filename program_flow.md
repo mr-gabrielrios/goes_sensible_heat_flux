@@ -18,7 +18,7 @@ The objective of this document is to catalogue the program flow of the sensible 
 The outline below details the calculation structure for this package. The lowest level of each branch is either an input (by the user or from an external source) or a variable that is being solved for iteratively. 
  
 ``` 
-q_H
+q_H (iterative)
 ├── T_lst
 │   ├── GOES-16 L2+ LSTC
 ├── T_air
@@ -49,7 +49,7 @@ q_H
 │   │   │   │   ├── ASOS
 │   │   ├── mu
 │   │   ├── rho
-│   ├── L
+│   ├── L (iterative)
 │   │   ├── rho
 │   │   ├── c_p
 │   │   ├── u_star (see above for inputs)
