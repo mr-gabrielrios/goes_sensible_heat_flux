@@ -69,3 +69,7 @@ q_H (iterative)
 - **zeta** (&zeta;) is the stability parameter, whose value dictates the convective state of the boundary layer. Where `zeta < 0`, the boundary layer is typically unstable, and where `zeta > 0`, it is typically stable.
     - **z** is the height from the reference point, **z**<sub>**r**</sub>, to the zero-plane displacement height, **d**<sub>**0**</sub>, which itself is a function of the roughness element height, **h**<sub>**0**</sub>.
     - **L** is the Obukhov length.
+    
+### Sensible Heat Flux Algorithm
+The sensible heat flux calculation iteratively solves for `L` to calculate `q_H`. 
+
