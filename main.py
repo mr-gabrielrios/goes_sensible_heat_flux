@@ -1,5 +1,3 @@
-### asos_data_processing branch
-
 ### Objective
 # The objective of this script is to generate the sensible heat flux based on input from GOES data.
 
@@ -25,8 +23,7 @@ import asos_data_reader as asos
 import mesonet_reader as meso
 import sensible_heat_flux as qh
 import plotter
-# import goes_air_temperature.goes_16_air_temperature as g16 # Old script
-import goes_air_temperature.goes_16_air_temp as g16 # Revised script
+import goes_air_temperature.goes_16_air_temperature as g16 # Revised script
 
 ### 1. Constants
 rho = 1.225     # Air density at station (kg/m^3) - note: p = rho*R*T
@@ -40,12 +37,12 @@ def main(start_date, end_date, site):
     
     p_air = 1013.25 # Air pressure, MSLP
     # Define location dictionary with site-specific properties
-    # Height above sea level for Bronx, Brooklyn, Manhattan, Queens, Staten Island MesoNET sites
-    site_info = {'BRON': [[11, 26], 57.5, 7.5],
-                 'BKLN': [[19, 22], 33.2, 7.5],
-                 'MANH': [[15, 22], 94.8, 10],
-                 'QUEE': [[15, 28], 54.6, 7.5],
-                 'STAT': [[20, 15], 33.1, 5]}
+    # Coordinates and flux tower height above sea level for Bronx, Brooklyn, Manhattan, Queens, Staten Island MesoNET sites
+    site_info = {'BRON': [[40.8714, -73.8963], 57.5],
+                 'BKLN': [[40.6305, -73.9521], 33.2],
+                 'MANH': [[40.7678, -73.9645], 94.8],
+                 'QUEE': [[40.7366, -73.8201], 54.6],
+                 'STAT': [[40.6021, -74.1504], 33.1]}
     
     # Specify date range of interest
     # Format: YYYYMMDDHHMM
@@ -57,7 +54,7 @@ def main(start_date, end_date, site):
     date_list, T_lst_list, T_air_list, h_0_list = [], [], [], []
     for t in date_range:
         t_int = int(t.strftime('%Y%m%d%H%M'))
-        l, a, h = g16.temperature_data(t_int, site_info[site][0][0], site_info[site][0][1], site)
+        l, a, h = g16.temperature_data(t_int, site_info[site][0], site)
         date_list.append(t.to_pydatetime())
         T_lst_list.append(l)
         T_air_list.append(a)
@@ -65,11 +62,10 @@ def main(start_date, end_date, site):
     agg_df = pd.DataFrame({'date': date_list, 
                            'T_lst': T_lst_list, 
                            'T_air': T_air_list, 
-                           'h_0': h_0_list})
-    # del date_list, T_lst_list, T_air_list, h_0_list
+                           'h_0': h_0_list})\
     
     # Access and process data from ASOS FTP for given dates
-    asos_data = asos.data_read(start_date, end_date, site)
+    asos_data = asos.data_read(start_date, end_date, site_info[site][0])
     agg_df['u_r'] = asos_data['u_r']
     # agg_df['T_air'] = asos_data['T_air']
     agg_df = agg_df[:-1] # Cut off last row to remove hanging timestamp (midnight on next day)
@@ -111,5 +107,5 @@ def main(start_date, end_date, site):
     ## End iterative method
 
 runtime = time.time()
-model_data = main(201907260000, 201907290000, 'MANH') 
+model_data = main(201909190000, 201909230000, 'STAT') 
 print('Program runtime: %.4f s' % (time.time()-runtime))

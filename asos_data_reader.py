@@ -19,9 +19,8 @@ import re
 import time
 from datetime import datetime 
 from datetime import timedelta
-
-# Start script timer
-t = time.time()
+import os
+import numpy as np
 
 ### Auxiliary methods for unit conversion
 # Convert Celsius to Kelvin
@@ -31,22 +30,72 @@ def CtoK(T):
 def KTtoMS(u):
     return u*0.51444
 
+# Boolean to control strings with performance data printing to the console. If True, strings should print.  
+str_switch = False
+
 #############################################################################
+### ASOS Station Finder
+# Objective: Find ASOS station closest to given latitude and longitude
+# Input: latitude (float) and longitude (float)
+# Output: ASOS station code
+
+# Define local ASOS station list filepath. Uncomment the second definition for a path to the online text file
+asos_station_fp = os.getcwd() + '/asos_data/asos-stations.txt'
+# asos_station_fp = r'https://www.ncdc.noaa.gov/homr/file/asos-stations.txt'
+
+# Define relevant columns
+asos_cols = ['CALL', 'NAME', 'LAT', 'LON', 'ELEV', 'UTC']
+
+R = 6378137 # GRS80 semi-major axis of Earth, per GOES-16 PUG-L2, Volume 5, Table 4.2.8
+    
+## Great circle distance calculator
+# Function takes coordinates for point of interest (loc) and ASOS station (asos) and calculates distance
+def distance(lat_loc, lon_loc, lat_asos, lon_asos):
+    p = np.pi/180
+    a = 0.5 - np.cos((lat_asos-lat_loc)*p)/2 + np.cos(lat_loc*p) * np.cos(lat_asos*p) * (1-np.cos((lon_asos-lon_loc)*p))/2
+    return 2*R*np.arcsin(np.sqrt(a))
+
+def asos_find(lat_loc, lon_loc):
+    t = time.time()
+    # Read data into ASOS DataFrame (adf)
+    adf = pd.read_fwf(asos_station_fp, usecols=asos_cols).drop([0])
+    # Read relevant parameters into lists for iterative purposes
+    stations, lat_asos, lon_asos = [adf['CALL'].tolist(), adf['LAT'].astype(float).tolist(), adf['LON'].astype(float).tolist()]
+    
+    dists = 2*np.pi*R # Define arbitrarily large number as an initial condition (rouglhy equal to circumference of Earth)
+    station = '' # Initialize empty string for population
+    # Iterate over 
+    for i in range(1, len(lat_asos)):
+        dist = distance(lat_loc, lon_loc, lat_asos[i], lon_asos[i])
+        if dist < dists:
+            dists = dist
+            station = 'K' + stations[i]
+
+    if str_switch:
+        print("Closest station: %s, %.2f m away" % (station, dists))
+        print('asos_find runtime: %.4f s' % (time.time() - t))
+    # asos_find(25.8223, -80.2895) # Function call for troubleshooting purposes. Move out of function if used.
+    return station
+            
+#############################################################################
+### Data Read
+# Objective: Process data from ASOS .dat files and return DataFrame with selected parameters
+# Input: start date (int), end date (int), location (str)
+# Output: Pandas DataFrame
 
 def data_read(start_date, end_date, loc):
-
-    # Brooklyn flux data
-    # Select data for JFK for June 2019 as a test case
-    # TO DO: write algorithm to based FTP data access based on start and end dates specified
-    if loc == "STAT":
-        data_url = "asos_data/64010KEWR201907.dat"
-        # data_url = "ftp://ftp.ncdc.noaa.gov/pub/data/asos-fivemin/6401-2019/64010KEWR201906.dat"
-    elif loc == "BKLN":
-        data_url = "asos_data/64010KJFK201907.dat"
-        # data_url = "ftp://ftp.ncdc.noaa.gov/pub/data/asos-fivemin/6401-2019/64010KJFK201906.dat"
-    elif loc == "QUEE" or loc == "BRON" or loc == "MANH":
-        # data_url = "ftp://ftp.ncdc.noaa.gov/pub/data/asos-fivemin/6401-2019/64010KLGA201906.dat"
-        data_url = "asos_data/64010KLGA201907.dat"
+    
+    # Create file path based on nearest ASOS station
+    data_url = 'ftp://ftp.ncdc.noaa.gov/pub/data/asos-fivemin/6401-' + \
+        str(start_date)[0:4] + '/' + '64010' + asos_find(loc[0], loc[1]) + str(start_date)[0:6] + '.dat'
+    
+    # Backup to re-direct to local files if ASOS FTP is down
+    # if loc == "STAT":
+    #     data_url = "asos_data/64010KEWR201907.dat"
+    # elif loc == "BKLN":
+    #     data_url = "asos_data/64010KJFK201907.dat"
+    # elif loc == "QUEE" or loc == "BRON" or loc == "MANH":
+    #     data_url = "asos_data/64010KLGA201907.dat"
         
     # Import data to dataframe. Note that column 6 is wind information, column 9 is air temperature
     data = pd.read_table(data_url)
@@ -103,6 +152,3 @@ def main(start_date, end_date, loc):
     
 if __name__ == "__main__":
     main()
-
-# Print elapsed time for script function
-# print('Time elapsed for iteration: %.3f' % (time.time()-t))
