@@ -3,8 +3,9 @@
 
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime as dt
 from datetime import timedelta
+from time_adjust import time_adjust
 import numpy as np
 
 ### Auxiliary method for file sorting by date in filename
@@ -17,6 +18,7 @@ def CtoK(T):
     return T + 273.15
 
 def csv_reader(start_date, end_date, data_dir):
+    
     data_cols = [2, 23, 29, 46] # Datetime, sensible heat flux, friction velocity, air temperature
     
     # Initialize empty array to hold file data
@@ -31,8 +33,8 @@ def csv_reader(start_date, end_date, data_dir):
     # Specify date range of interest
     # Format: YYYYMMDDHHMM
     # [start_date, end_date] = [201906140000, 201906150000]
-    [start_date_fmtd, end_date_fmtd] = [datetime.strptime(str(start_date), '%Y%m%d').strftime('%Y-%m-%d %H:%M:%S'),
-                                        datetime.strptime(str(end_date+1), '%Y%m%d').strftime('%Y-%m-%d %H:%M:%S')]
+    [start_date_fmtd, end_date_fmtd] = [dt.strptime(str(start_date), '%Y%m%d').strftime('%Y-%m-%d %H:%M:%S'),
+                                        dt.strptime(str(end_date+1), '%Y%m%d').strftime('%Y-%m-%d %H:%M:%S')]
     date_range = pd.date_range(start_date_fmtd, end_date_fmtd, (end_date+1-start_date)*48+1)
     date_range = [t.to_pydatetime() for t in date_range]
     
@@ -50,7 +52,7 @@ def csv_reader(start_date, end_date, data_dir):
     idx_list = []
     # Iterate through each date and reformat each entry
     for i in range(0,data.shape[0]):        
-        data.iloc[i, 0] = datetime.strptime(data.iloc[i, 0], '%Y-%m-%d %H:%M:%S.%f').strftime('%Y-%m-%d %H:%M:%S')
+        data.iloc[i, 0] = dt.strptime(data.iloc[i, 0], '%Y-%m-%d %H:%M:%S.%f').strftime('%Y-%m-%d %H:%M:%S')
         # If Mesonet data is missing, log the index so that the next loop can fill in missing data with nans
         if str(data.iloc[i, 0]) != str(date_range[ii]):
             print('Missing date: ', data.iloc[i, 0])

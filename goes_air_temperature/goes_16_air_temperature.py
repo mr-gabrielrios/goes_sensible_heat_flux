@@ -1,10 +1,12 @@
 ### Import statements
-import os,datetime,timezonefinder,pytz,pyproj,csv,re,elevation,rasterio,requests,time
+import os,glob,datetime,timezonefinder,pytz,pyproj,csv,re,elevation,rasterio,requests,time
 from google.cloud import storage
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+from matplotlib import rcParams
+import math
 import cartopy.crs as ccrs
 import cartopy.io.img_tiles as tiles
-import matplotlib.colors as colors
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import numpy as np
 from netCDF4 import Dataset
@@ -19,9 +21,9 @@ warnings.filterwarnings("ignore")
 ##################################################################################################################
 
 cwd = os.getcwd() + '/goes_air_temperature/'
-aux_dir = '/aux/'
+aux_dir = 'aux/'
 # Boolean to control strings with performance data printing to the console. If True, strings should print.  
-str_switch = True
+str_switch = False
 # Boolean to control plotting of temperature product. If True, plots should print.  
 plot_switch = False
 
@@ -45,8 +47,10 @@ bucket_16 = client.get_bucket('gcp-public-data-goes-16') # call the GOES-16 stor
 if str_switch:
     print("Google Cloud Storage data access elapsed time: %.2f s" % (time.time() - t))
 
-# Bounding box definition for New York - use only for debugging
-bbox = [-74.50564249616093, 40.24587322565815, -73.45027336215357, 41.165290318055426]
+def site_info(crd):
+    res = 0.25
+    bbox = np.array([crd[1] - res, crd[0] - res, crd[1] + res, crd[0] + res])
+    return bbox
 
 ## ################## END Google Cloud Storage Credentials #########################
 
@@ -54,9 +58,11 @@ bbox = [-74.50564249616093, 40.24587322565815, -73.45027336215357, 41.1652903180
 ### Basemapper Plot (to be replaced by plotter.py)
 # Objective: Grab LST data from GOES-16 ABI L2+ on Google Cloud
 
-def basemapper():
+def basemapper(crd):
     
     t = time.time()
+    
+    bbox = site_info(crd)
 
     layout_map = tiles.QuadtreeTiles()
     fig = plt.figure(figsize=(12,9))
@@ -83,29 +89,33 @@ def basemapper():
 
 ######################################################################################################
 ### GOES-16 Grid Build
-t = time.time()
 
-goes_grid_file = cwd + aux_dir + 'GOESR_ABI_CONUS_East.nc'
-grid_dataset = Dataset(goes_grid_file)
-lats,lons = grid_dataset.variables['Latitude'][:].data,grid_dataset.variables['Longitude'][:].data
-
-# Boundary grid indices based on lat/lon bounding box
-nc_indx_corners = np.array([np.unravel_index(np.argmin(np.abs(np.subtract(lons, bbox[0])) + np.abs(np.subtract(lats,bbox[1]))), np.shape(lats)), \
-                            np.unravel_index(np.argmin(np.abs(np.subtract(lons,bbox[0]))+np.abs(np.subtract(lats,bbox[3]))),np.shape(lats)), \
-                            np.unravel_index(np.argmin(np.abs(np.subtract(lons,bbox[2]))+np.abs(np.subtract(lats,bbox[1]))),np.shape(lats)), \
-                            np.unravel_index(np.argmin(np.abs(np.subtract(lons,bbox[2]))+np.abs(np.subtract(lats,bbox[3]))),np.shape(lats))])
-# clip indices for lat/lon of city and GOES-16 data
-nc_indx_bounds = [np.min([nc_indx_corners[0][0],nc_indx_corners[1][0],nc_indx_corners[2][0],nc_indx_corners[3][0]]),
-                 np.max([nc_indx_corners[0][0],nc_indx_corners[1][0],nc_indx_corners[2][0],nc_indx_corners[3][0]]),
-                 np.min([nc_indx_corners[0][1],nc_indx_corners[1][1],nc_indx_corners[2][1],nc_indx_corners[3][1]]),
-                 np.max([nc_indx_corners[0][1],nc_indx_corners[1][1],nc_indx_corners[2][1],nc_indx_corners[3][1]])]
-
-########## These are the real GOES-16 lat/lon coords that correspond with the city boundaries ############
-lon_plot = lons[nc_indx_bounds[0]:nc_indx_bounds[1],nc_indx_bounds[2]:nc_indx_bounds[3]]
-lat_plot = lats[nc_indx_bounds[0]:nc_indx_bounds[1],nc_indx_bounds[2]:nc_indx_bounds[3]]
-
-if str_switch:
-    print("Lat/lon data pull and clip elapsed time: %.2f s" % (time.time() - t))      
+def goes_grid(bbox):
+    t = time.time()
+    
+    goes_grid_file = cwd + aux_dir + 'GOESR_ABI_CONUS_East.nc'
+    grid_dataset = Dataset(goes_grid_file)
+    lats,lons = grid_dataset.variables['Latitude'][:].data,grid_dataset.variables['Longitude'][:].data
+    
+    # Boundary grid indices based on lat/lon bounding box
+    nc_indx_corners = np.array([np.unravel_index(np.argmin(np.abs(np.subtract(lons, bbox[0])) + np.abs(np.subtract(lats,bbox[1]))), np.shape(lats)), \
+                                np.unravel_index(np.argmin(np.abs(np.subtract(lons,bbox[0]))+np.abs(np.subtract(lats,bbox[3]))),np.shape(lats)), \
+                                np.unravel_index(np.argmin(np.abs(np.subtract(lons,bbox[2]))+np.abs(np.subtract(lats,bbox[1]))),np.shape(lats)), \
+                                np.unravel_index(np.argmin(np.abs(np.subtract(lons,bbox[2]))+np.abs(np.subtract(lats,bbox[3]))),np.shape(lats))])
+    # clip indices for lat/lon of city and GOES-16 data
+    nc_indx_bounds = [np.min([nc_indx_corners[0][0],nc_indx_corners[1][0],nc_indx_corners[2][0],nc_indx_corners[3][0]]),
+                     np.max([nc_indx_corners[0][0],nc_indx_corners[1][0],nc_indx_corners[2][0],nc_indx_corners[3][0]]),
+                     np.min([nc_indx_corners[0][1],nc_indx_corners[1][1],nc_indx_corners[2][1],nc_indx_corners[3][1]]),
+                     np.max([nc_indx_corners[0][1],nc_indx_corners[1][1],nc_indx_corners[2][1],nc_indx_corners[3][1]])]
+    
+    ########## These are the real GOES-16 lat/lon coords that correspond with the city boundaries ############
+    lon_plot = lons[nc_indx_bounds[0]:nc_indx_bounds[1],nc_indx_bounds[2]:nc_indx_bounds[3]]
+    lat_plot = lats[nc_indx_bounds[0]:nc_indx_bounds[1],nc_indx_bounds[2]:nc_indx_bounds[3]]
+    
+    if str_switch:
+        print("Lat/lon data pull and clip elapsed time: %.2f s" % (time.time() - t))     
+    
+    return lats, lons, nc_indx_corners, nc_indx_bounds, lon_plot, lat_plot
         
 ## ################## END GOES-16 Grid Build #########################
 
@@ -115,69 +125,107 @@ if str_switch:
 # Averaging methodology:    pull WRF reference heights, match to corresponding NLCD class, 
 #                           get dot product of each pixel, then get average
 
-t = time.time()
+def nlcd_grid(crd):
 
-nlcd_goes = []
-
-nlcd_data_fp = cwd + aux_dir + 'nlcd_to_goes_upscaled.csv' # Define file path for NLCD distribution CSV file
-nlcd_zr_fp = cwd + aux_dir + 'nlcd_reference_heights.csv' # Define file path for NLCD reference heights CSV file
-
-nlcd_rows = np.linspace(nc_indx_bounds[0], nc_indx_bounds[1]-1, (nc_indx_bounds[1]-nc_indx_bounds[0]))
-nlcd_rows = [int(i) for i in nlcd_rows]
-nlcd_cols = np.linspace(nc_indx_bounds[2], nc_indx_bounds[3]-1, (nc_indx_bounds[3]-nc_indx_bounds[2]))
-nlcd_cols = [int(i) for i in nlcd_cols]
-
-nlcd_goes = pd.read_csv(nlcd_data_fp, usecols=nlcd_cols)
-nlcd_goes = nlcd_goes[nlcd_goes.index.isin(nlcd_rows)]
-
-nlcd_goes = np.array(nlcd_goes)
-
-nlcd_goes_clip = nlcd_goes[nc_indx_bounds[0]:nc_indx_bounds[1],
-                            nc_indx_bounds[2]:nc_indx_bounds[3]] 
-nlcd_upscaled = np.array(np.zeros((np.shape(nlcd_goes)[0],np.shape(nlcd_goes)[1],20)))
-for nlcd_ii in range(0,np.shape(nlcd_goes)[0]):
-    for nlcd_jj in range(0,np.shape(nlcd_goes)[1]):
-        if nlcd_goes[nlcd_ii][nlcd_jj]=='nan':
-            nlcd_ii_jj = np.repeat(np.nan,20)
-        else:
-            nlcd_ii_jj = [float(qq) for qq in re.sub(' +',',',\
-                              str(nlcd_goes[nlcd_ii][nlcd_jj]).replace('[',\
-                          '').replace(']','').replace('\n','')).split(',') if qq!='']
-
-        # if len(nlcd_ii_jj)!=20:
-        #     print('ISSUE WITH NLCD')
-        nlcd_upscaled[nlcd_ii][nlcd_jj] = nlcd_ii_jj # match NLCD data to GOES-16 grid shape
-
-# Filter out water locations
-water_locs_ii,water_locs_jj = [],[]
-for water_ii in range(0,np.shape(nlcd_goes)[0]):
-    for water_jj in range(0,np.shape(nlcd_goes)[1]):
-        if nlcd_upscaled[water_ii][water_jj][0]>0.5 or np.isnan(nlcd_upscaled[water_ii][water_jj][0]):
-            water_locs_ii.append(water_ii)
-            water_locs_jj.append(water_jj)
-
-# Use DataFrame to read in the NLCD WRF reference heights
-nlcd_hts = pd.read_csv(nlcd_zr_fp, usecols=['ZR']).to_numpy().ravel()
-h_0 = np.zeros([nlcd_upscaled.shape[0], nlcd_upscaled.shape[1]])
-for i in range(0, h_0.shape[0]):
-    for j in range(0, h_0.shape[1]):
-        h_0[i, j] = np.dot(nlcd_upscaled[i, j], nlcd_hts)
-        
-# Plot to show roughness heights for selected plot area, based on upscaled NLCD values
-fig, ax = plt.subplots()
-im = ax.pcolormesh(nlcd_cols, nlcd_rows, h_0)
-im_cbar = fig.colorbar(im, ax = ax)
-im_cbar.ax.get_yaxis().labelpad = 15
-im_cbar.ax.set_ylabel('h_0 [m]', rotation=270)
-plt.gca().invert_yaxis()
-plt.gca().set_aspect('equal', adjustable='box')
-plt.title('Roof Level based on Upscaled NLCD Values')
-plt.show()
-
-if str_switch:
-    print("NLCD upscaled value access/plot time: %.2f s" % (time.time() - t))
+    t = time.time()
     
+    bbox = site_info(crd)
+    [_, _, _, nc_indx_bounds, _, _] = goes_grid(bbox)
+    
+    nlcd_goes = []
+    
+    nlcd_data_fp = cwd + aux_dir + 'nlcd_to_goes_upscaled.csv' # Define file path for NLCD distribution CSV file
+    nlcd_zr_fp = cwd + aux_dir + 'nlcd_reference_heights.csv' # Define file path for NLCD reference heights CSV file
+    
+    nlcd_rows = np.linspace(nc_indx_bounds[0], nc_indx_bounds[1]-1, (nc_indx_bounds[1]-nc_indx_bounds[0]))
+    nlcd_rows = [int(i) for i in nlcd_rows]
+    nlcd_cols = np.linspace(nc_indx_bounds[2], nc_indx_bounds[3]-1, (nc_indx_bounds[3]-nc_indx_bounds[2]))
+    nlcd_cols = [int(i) for i in nlcd_cols]
+    
+    nlcd_goes = pd.read_csv(nlcd_data_fp, usecols=nlcd_cols)
+    nlcd_goes = nlcd_goes[nlcd_goes.index.isin(nlcd_rows)]
+    
+    nlcd_goes = np.array(nlcd_goes)
+    
+    nlcd_goes_clip = nlcd_goes[nc_indx_bounds[0]:nc_indx_bounds[1],
+                                nc_indx_bounds[2]:nc_indx_bounds[3]] 
+    nlcd_upscaled = np.array(np.zeros((np.shape(nlcd_goes)[0],np.shape(nlcd_goes)[1],20)))
+    for nlcd_ii in range(0,np.shape(nlcd_goes)[0]):
+        for nlcd_jj in range(0,np.shape(nlcd_goes)[1]):
+            if nlcd_goes[nlcd_ii][nlcd_jj]=='nan':
+                nlcd_ii_jj = np.repeat(np.nan,20)
+            else:
+                nlcd_ii_jj = [float(qq) for qq in re.sub(' +',',',\
+                                  str(nlcd_goes[nlcd_ii][nlcd_jj]).replace('[',\
+                              '').replace(']','').replace('\n','')).split(',') if qq!='']
+    
+            # if len(nlcd_ii_jj)!=20:
+            #     print('ISSUE WITH NLCD')
+            nlcd_upscaled[nlcd_ii][nlcd_jj] = nlcd_ii_jj # match NLCD data to GOES-16 grid shape
+    
+    # Filter out water locations
+    water_locs_ii,water_locs_jj = [],[]
+    for water_ii in range(0,np.shape(nlcd_goes)[0]):
+        for water_jj in range(0,np.shape(nlcd_goes)[1]):
+            if nlcd_upscaled[water_ii][water_jj][0]>0.5 or np.isnan(nlcd_upscaled[water_ii][water_jj][0]):
+                water_locs_ii.append(water_ii)
+                water_locs_jj.append(water_jj)
+                
+    return nlcd_upscaled, water_locs_ii, water_locs_jj
+
 ## ################## END NLCD Grid Setup #########################
+        
+######################################################################################################
+### Roughness Height Grid Setup
+# Objective: Use DataFrame to read in the NLCD WRF reference heights
+
+def roughness_height_grid(crd):
+
+    nlcd_zr_fp = cwd + aux_dir + 'nlcd_reference_heights.csv' # Define file path for NLCD reference heights CSV file
+    nlcd_hts = pd.read_csv(nlcd_zr_fp, usecols=['ZR']).to_numpy().ravel()
+    
+    [nlcd_upscaled, _, _] = nlcd_grid(crd)
+    
+    h_0 = np.zeros([nlcd_upscaled.shape[0], nlcd_upscaled.shape[1]])
+    for i in range(0, h_0.shape[0]):
+        for j in range(0, h_0.shape[1]):
+            h_0[i, j] = np.dot(nlcd_upscaled[i, j], nlcd_hts)
+            
+    bbox = site_info(crd)
+    [_, _, _, nc_indx_bounds, _, _] = goes_grid(bbox)
+    nlcd_rows = np.linspace(nc_indx_bounds[0], nc_indx_bounds[1]-1, (nc_indx_bounds[1]-nc_indx_bounds[0]))
+    nlcd_rows = [int(i) for i in nlcd_rows]
+    nlcd_cols = np.linspace(nc_indx_bounds[2], nc_indx_bounds[3]-1, (nc_indx_bounds[3]-nc_indx_bounds[2]))
+    nlcd_cols = [int(i) for i in nlcd_cols]
+        
+    ## Plot to show roughness heights for selected plot area, based on upscaled NLCD values
+    
+    # Set up figure
+    fig, ax = plt.subplots()
+    font_sz = 10
+    rcParams['font.family'] = 'FreeSans'
+    rcParams['font.size'] = font_sz
+    
+    # Set up alternate grid data with demarcated site point
+    h_0_alt = h_0
+    h_0_alt[int(h_0_alt.shape[0]/2), int(h_0_alt.shape[1]/2)] = np.amax(h_0)*1.5
+    print(int(h_0_alt.shape[0]/2), int(h_0_alt.shape[1]/2))
+    # Perform actual plotting
+    im = ax.pcolormesh(nlcd_cols, nlcd_rows, h_0_alt)
+    im_cbar = fig.colorbar(im, ax = ax)
+    im_cbar.ax.get_yaxis().labelpad = 15
+    im_cbar.ax.set_ylabel('h_0 [m]', rotation=270)
+    plt.gca().invert_yaxis()
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.title('Roughness Height based on Upscaled NLCD Values')
+    plt.show()
+    
+    if str_switch:
+        print("NLCD upscaled value access/plot time: %.2f s" % (time.time() - t))
+        
+    return h_0
+    
+## ################## END Roughness Height Grid Setup #########################
 
 ######################################################################################################
 ### Elevation Grid Setup
@@ -188,36 +236,40 @@ t = time.time()
 
 # IMPORTANT:    Only 2 degree square centered around Manhattan is saved to elevation.csv. For non-New York
 #               locales, elevation.csv must be generated for them            
-dem_raster = rasterio.open(cwd + 'elevation_tifs/elevation.tif')
+# dem_raster = rasterio.open(cwd + 'elevation_tifs/us-xnq.tif')
 
-src_crs = dem_raster.crs # get projection info
-utm = pyproj.Proj(src_crs) # Pass CRS of image from rasterio
-lonlat = pyproj.Proj(init='epsg:4326') 
-src_shape = src_height, src_width = dem_raster.shape
-T0 = rasterio.transform.from_bounds(bbox[0], bbox[1], bbox[2], bbox[3], src_width, src_height)
-x_ll,y_ll = T0*((pyproj.transform(lonlat,utm,bbox[0],bbox[1])))
-x_ul,y_ul = T0*((pyproj.transform(lonlat,utm,bbox[0],bbox[3])))
-x_lr,y_lr = T0*((pyproj.transform(lonlat,utm,bbox[2],bbox[1])))
-x_ur,y_ur = T0*((pyproj.transform(lonlat,utm,bbox[2],bbox[3])))
-x_span = [x_ll,x_ul,x_lr,x_ur]
-y_span = [y_ll,y_ul,y_lr,y_ur]
-cols, rows = np.meshgrid(np.arange(src_width),np.arange(src_height))
-eastings,northings = T0*(cols,rows)
-cols,rows = [],[]
-# transformation from raw projection to WGS84 lat/lon values
-xvals,yvals = (eastings,northings)
+# src_crs = dem_raster.crs # get projection info
+# utm = pyproj.Proj(src_crs) # Pass CRS of image from rasterio
+# lonlat = pyproj.Proj(init='epsg:4326') 
+# src_shape = src_height, src_width = dem_raster.shape
+# T0 = rasterio.transform.from_bounds(bbox[0], bbox[1], bbox[2], bbox[3], src_width, src_height)
+# x_ll,y_ll = T0*((pyproj.transform(lonlat,utm,bbox[0],bbox[1])))
+# x_ul,y_ul = T0*((pyproj.transform(lonlat,utm,bbox[0],bbox[3])))
+# x_lr,y_lr = T0*((pyproj.transform(lonlat,utm,bbox[2],bbox[1])))
+# x_ur,y_ur = T0*((pyproj.transform(lonlat,utm,bbox[2],bbox[3])))
+# x_span = [x_ll,x_ul,x_lr,x_ur]
+# y_span = [y_ll,y_ul,y_lr,y_ur]
+# cols, rows = np.meshgrid(np.arange(src_width),np.arange(src_height))
+# eastings,northings = T0*(cols,rows)
+# cols,rows = [],[]
+# # transformation from raw projection to WGS84 lat/lon values
+# xvals,yvals = (eastings,northings)
 
-elev = dem_raster.read(1) # actual elevation data from DEM
-lats_elev,lons_elev = (pyproj.transform(utm,lonlat,xvals,yvals)) # actual lats/lons for elevation data
+# elev = dem_raster.read(1) # actual elevation data from DEM
+# lats_elev,lons_elev = (pyproj.transform(utm,lonlat,xvals,yvals)) # actual lats/lons for elevation data
 
-elev = elev.ravel() # ravel the elevation for processing
-lats_elev = lats_elev.ravel() # ravel for processing
-lons_elev = lons_elev.ravel() # ravel for processing
+# elev = elev.ravel() # ravel the elevation for processing
+# lats_elev = lats_elev.ravel() # ravel for processing
+# lons_elev = lons_elev.ravel() # ravel for processing
 
-# this is somewhat of a computationally expensive process, but it finds the elevation nearest to each GOES-16 pixel
-goes_elev = [elev[np.argmin(np.abs(np.subtract(ii,lons_elev))+np.abs(np.subtract(jj,\
-                                  lats_elev)))] for ii,jj in zip(lon_plot.ravel(),lat_plot.ravel())]
-goes_elev = np.reshape(goes_elev,np.shape(lat_plot)) # reshape to match GOES-16 grid
+# # this is somewhat of a computationally expensive process, but it finds the elevation nearest to each GOES-16 pixel
+# goes_elev = [elev[np.argmin(np.abs(np.subtract(ii,lons_elev))+np.abs(np.subtract(jj,\
+#                                   lats_elev)))] for ii,jj in zip(lon_plot.ravel(),lat_plot.ravel())]
+# goes_elev = np.reshape(goes_elev,np.shape(lat_plot)) # reshape to match GOES-16 grid
+
+# For non-New York elevation 
+
+
 
 if str_switch:
     print("Elevation data access time: %.2f s" % (time.time() - t))
@@ -225,8 +277,14 @@ if str_switch:
 ######################################################################################################
 ### GOES-16 LST Data Access and Plotting
 
-def temperature_data(query_date, crd, site):
-    query_date = datetime.datetime.strptime(str(query_date), '%Y%m%d%H%M').strftime('%Y%j%H%M%S%f')
+def temperature_data(query_date, crd, site, bbox, goes_grid_info, nlcd_grid_info, h_0):
+    
+    # Non-iterative information (defined in main.py)
+    [lats, lons, nc_indx_corners, nc_indx_bounds, lon_plot, lat_plot] = goes_grid_info
+    [nlcd_upscaled, water_locs_ii, water_locs_jj] = nlcd_grid_info
+    
+    fname = glob.glob(cwd + 'elevation_data/' + site + '*.csv')[0]
+    goes_elev = np.loadtxt(open(fname, 'r'), delimiter=',')
     
     def crd_to_grid(crd):
         t = time.time()
@@ -261,14 +319,17 @@ def temperature_data(query_date, crd, site):
     else:
         # Display the current time in that time zone
         timezone = pytz.timezone(timezone_str)
-        dt = datetime.datetime.strptime(query_date, '%Y%j%H%M%S%f')
+        # dt = datetime.datetime.strptime(query_date, '%Y%j%H%M%S%f')
+        dt = query_date
+        utc_offset = timezone.utcoffset(dt)
         print ("The queried time in %s is %s" % (timezone_str, dt + timezone.utcoffset(dt)))
         
     prod = 'LST' # Level L-2 Product identifier
     product_ID = 'ABI-L2-'+prod+'C/' # ABI, L2 product, CONUS
     
     local_t = dt + timezone.utcoffset(dt) # local time with UTC offset (need this for Air temp algorithm)
-    t_search = datetime.datetime.strptime(query_date,'%Y%j%H%M%S%f') # UTC time for searching for GOES-16 data files - this can be changed to anything
+    # t_search = datetime.datetime.strptime(query_date,'%Y%j%H%M%S%f') # UTC time for searching for GOES-16 data files - this can be changed to anything
+    t_search = query_date
     
     goes_16_date_vec = []
     goes_16_file_vec = []
@@ -347,7 +408,11 @@ def temperature_data(query_date, crd, site):
     # LST Plot
     if plot_switch:
         fig,ax = basemapper() # plot the basemap for visualization
-        norm = colors.BoundaryNorm(boundaries=np.linspace(280, 310, 10), ncolors=256)
+        # Set colorbar limits, resolution, and number of increments
+        norm_t = [210, 320] # Limits chosen based on min and max temperatures recorded in CONUS
+        norm_res = 5
+        norm_incs = math.ceil((norm_t[1] - norm_t[0])/norm_res) # Get ceiling to force integer
+        norm = colors.BoundaryNorm(boundaries=np.linspace(norm_t[0], norm_t[1], norm_incs), ncolors=256)
         p1 = ax.pcolormesh(lon_plot-lon_adjust,lat_plot-lat_adjust,prod_vals,zorder=999,alpha=0.6,transform=ccrs.PlateCarree(), norm=norm) # plotting the product data
         
         cb = fig.colorbar(p1) # colorbar
@@ -446,11 +511,16 @@ def temperature_data(query_date, crd, site):
     
     area_lst = np.nanmean(prod_vals[(lat_pixel-pixel_res):(lat_pixel+pixel_res+1), (lon_pixel-pixel_res):(lon_pixel+pixel_res+1)])
     area_T_air = np.nanmean(T_air[(lat_pixel-pixel_res):(lat_pixel+pixel_res+1), (lon_pixel-pixel_res):(lon_pixel+pixel_res+1)])
+    area_h_0 = np.nanmean(h_0[(lat_pixel-pixel_res):(lat_pixel+pixel_res+1), (lon_pixel-pixel_res):(lon_pixel+pixel_res+1)])
         
     # Air Temperature Plot
     if plot_switch:
         fig2,ax2 = basemapper() # plot the air temp basemap
-        norm = colors.BoundaryNorm(boundaries=np.linspace(270, 320, 10), ncolors=256)
+        # Set colorbar limits, resolution, and number of increments
+        norm_t = [210, 320] # Limits chosen based on min and max temperatures recorded in CONUS
+        norm_res = 5
+        norm_incs = math.ceil((norm_t[1] - norm_t[0])/norm_res) # Get ceiling to force integer
+        norm = colors.BoundaryNorm(boundaries=np.linspace(norm_t[0], norm_t[1], norm_incs), ncolors=256)
         
         p2 = ax2.pcolormesh(lon_plot-lon_adjust,lat_plot-lat_adjust,T_air,zorder=999,alpha=0.6,transform=ccrs.PlateCarree(), norm=norm) # plotting the air temp data
         
@@ -466,7 +536,9 @@ def temperature_data(query_date, crd, site):
     if str_switch:
         print("Air temperature calculation runtime: %.2f s" % (time.time() - t))
     
+    print('Air temp: ', area_T_air)
+    
     print('--------------------------------------------------')    
     print('Total GOES_16_LST_to_Tair runtime: %.3f s \n' % (time.time() - start_time))
     
-    return area_lst, area_T_air, h_0[lat_pixel, lon_pixel]
+    return area_lst, area_T_air, area_h_0, utc_offset

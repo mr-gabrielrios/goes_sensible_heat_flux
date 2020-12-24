@@ -43,14 +43,14 @@ def agg_plot(data, loc, **kwargs):
     ax4.set_ylabel('T [K]')
     ax4.plot(data['date'], data['T_lst'])
     ax4.plot(data['date'], data['T_air'])
-    ax4.plot(data['date'], data['T_air_meso'])
-    ax4.legend(['T_lst', 'T_air', 'T_air_meso'], loc='best')
+    ax4.plot(data['date'], data['T_air_obs'])
+    ax4.legend(['T_lst', 'T_air', 'T_air_obs'], loc='best')
     
     ax5.set_title('T_lst - T_air')    
     ax5.set_ylabel('T [K]')
     ax5.plot(data['date'], data['T_lst']-data['T_air'])
-    ax5.plot(data['date'], data['T_lst']-data['T_air_meso'])
-    ax5.legend(['T_lst-T_air', 'T_lst-T_air_meso'], loc='best')
+    ax5.plot(data['date'], data['T_lst']-data['T_air_obs'])
+    ax5.legend(['T_lst-T_air', 'T_lst-T_air_obs'], loc='best')
     
     ax6.set_title('Wind velocities')
     # ax6.plot(data['date'], data['u_r'])

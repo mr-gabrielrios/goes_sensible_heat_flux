@@ -16,10 +16,14 @@
 
 ### 0. Imports
 import time
+import glob, sys
 import pandas as pd
+import numpy as np
 from datetime import datetime as dt
+from datetime import timedelta as td
 import matplotlib.pyplot as plt
 import asos_data_reader as asos
+import ameriflux_data_processing as af
 import mesonet_reader as meso
 import sensible_heat_flux as qh
 import plotter
@@ -35,6 +39,25 @@ R = 287.05      # Gas constant
 # Main function definition
 def main(start_date, end_date, site):
     
+    # Import Ameriflux data characteristics for site instrumentation
+    # Source: https://ameriflux.lbl.gov/data/measurement-height/
+    ameriflux_site_data = pd.read_csv('ameriflux_data/BASE_MeasurementHeight_20201218.csv')
+    # Try to fetch measurement height (z_r). If not found, use median height of all towers
+    if ameriflux_site_data.loc[(ameriflux_site_data['Site_ID'] == site) & (ameriflux_site_data['Variable'] == 'TA_1_1_1')].empty:
+        z_r = np.nanmedian(ameriflux_site_data.loc[ameriflux_site_data['Variable'] == 'TA_1_1_1']['Height'])
+    else:
+        z_r = ameriflux_site_data.loc[(ameriflux_site_data['Site_ID'] == site) & (ameriflux_site_data['Variable'] == 'TA_1_1_1')]['Height']
+    print(z_r)
+    # Site-specific data
+    site_fpath = glob.glob('goes_air_temperature/elevation_data/' + site + '*.csv')[0]
+    crd = [float(site_fpath.split('_')[-3]), float(site_fpath.split('_')[-2])]
+    
+    # Non-iterative quantities    
+    bbox = g16.site_info(crd)
+    goes_grid_info = g16.goes_grid(bbox)    
+    nlcd_grid_info = g16.nlcd_grid(crd)
+    h_0 = g16.roughness_height_grid(crd)
+    
     p_air = 1013.25 # Air pressure, MSLP
     # Define location dictionary with site-specific properties
     # Coordinates and flux tower height above sea level for Bronx, Brooklyn, Manhattan, Queens, Staten Island MesoNET sites
@@ -42,19 +65,21 @@ def main(start_date, end_date, site):
                  'BKLN': [[40.6305, -73.9521], 33.2],
                  'MANH': [[40.7678, -73.9645], 94.8],
                  'QUEE': [[40.7366, -73.8201], 54.6],
-                 'STAT': [[40.6021, -74.1504], 33.1]}
+                 'STAT': [[40.6021, -74.1504], 33.1],
+                 site: [crd, 5]}
     
     # Specify date range of interest
     # Format: YYYYMMDDHHMM
-    [start_date_fmtd, end_date_fmtd] = [dt.strptime(str(start_date), '%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S'),
-                                        dt.strptime(str(end_date), '%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S')]
-    date_range = pd.date_range(start_date_fmtd, end_date_fmtd, (end_date-start_date)*24/10000+1)
+    [start_date, end_date] = [dt.strptime(str(start_date), '%Y%m%d%H%M'),
+                                        dt.strptime(str(end_date), '%Y%m%d%H%M')]
+    end_date = end_date - td(hours=1)
+    date_range = pd.date_range(start_date, end_date, (end_date-start_date).total_seconds()/3600+1)
     
     # Iterate over date range, incrementing by 1 hour
     date_list, T_lst_list, T_air_list, h_0_list = [], [], [], []
+    utc_offset = ''
     for t in date_range:
-        t_int = int(t.strftime('%Y%m%d%H%M'))
-        l, a, h = g16.temperature_data(t_int, site_info[site][0], site)
+        l, a, h, utc_offset = g16.temperature_data(t, site_info[site][0], site, bbox, goes_grid_info, nlcd_grid_info, h_0)
         date_list.append(t.to_pydatetime())
         T_lst_list.append(l)
         T_air_list.append(a)
@@ -62,20 +87,29 @@ def main(start_date, end_date, site):
     agg_df = pd.DataFrame({'date': date_list, 
                            'T_lst': T_lst_list, 
                            'T_air': T_air_list, 
-                           'h_0': h_0_list})\
+                           'h_0': h_0_list})
     
     # Access and process data from ASOS FTP for given dates
     asos_data = asos.data_read(start_date, end_date, site_info[site][0])
     agg_df['u_r'] = asos_data['u_r']
-    # agg_df['T_air'] = asos_data['T_air']
     agg_df = agg_df[:-1] # Cut off last row to remove hanging timestamp (midnight on next day)
     
     # Pull Mesonet data and assign to 'q_h_obs' column in aggregate DataFrame
-    mesonet_data = meso.csv_reader(start_date, end_date, ("mesonet_data/" + site))
-    agg_df['q_h_obs'] = mesonet_data['H'][::2].tolist()
-    agg_df['u_star_obs'] = mesonet_data['USTAR'][::2].tolist()
-    # agg_df['T_air'] = mesonet_data['T_air'][::2].tolist()
-    agg_df['T_air_meso'] = mesonet_data['T_air'][::2].tolist()
+    if site[0:2] != 'US':
+        mesonet_data = meso.csv_reader(start_date, end_date, ("mesonet_data/" + site))
+        agg_df['q_h_obs'] = mesonet_data['H'][::2].tolist()
+        agg_df['u_star_obs'] = mesonet_data['USTAR'][::2].tolist()
+        # agg_df['T_air'] = mesonet_data['T_air'][::2].tolist()
+        agg_df['T_air_obs'] = mesonet_data['T_air'][::2].tolist()
+    else:
+        af_data = af.csv_reader(site, site_info[site][0], start_date, end_date)
+        print(af_data)
+        agg_df['obs_time'] = af_data['datetime']
+        print(agg_df.shape)
+        print(af_data.shape)
+        agg_df['q_h_obs'] = af_data['H'].tolist()
+        agg_df['u_star_obs'] = af_data['u_star'].tolist()
+        agg_df['T_air_obs'] = af_data['T_air'].tolist()
     
     C_h_list, u_star_list, L_list, z_0m_list, zeta_list, q_h_list = [], [], [], [], [], []
     for index, row in agg_df.iterrows():
@@ -107,5 +141,5 @@ def main(start_date, end_date, site):
     ## End iterative method
 
 runtime = time.time()
-model_data = main(201909190000, 201909230000, 'STAT') 
+model_data = main(201903060000, 201903090000, 'US-ONA') 
 print('Program runtime: %.4f s' % (time.time()-runtime))
