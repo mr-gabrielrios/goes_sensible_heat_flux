@@ -41,22 +41,19 @@ def main(start_date, end_date, site):
     
     # Import Ameriflux data characteristics for site instrumentation
     # Source: https://ameriflux.lbl.gov/data/measurement-height/
-    ameriflux_site_data = pd.read_csv('ameriflux_data/BASE_MeasurementHeight_20201218.csv')
-    # Try to fetch measurement height (z_r). If not found, use median height of all towers
-    if ameriflux_site_data.loc[(ameriflux_site_data['Site_ID'] == site) & (ameriflux_site_data['Variable'] == 'TA_1_1_1')].empty:
-        z_r = np.nanmedian(ameriflux_site_data.loc[ameriflux_site_data['Variable'] == 'TA_1_1_1']['Height'])
+    if site[0:2] == 'US':
+        ameriflux_site_data = pd.read_csv('ameriflux_data/BASE_MeasurementHeight_20201218.csv')
+        # Try to fetch measurement height (z_r). If not found, use median height of all towers
+        if ameriflux_site_data.loc[(ameriflux_site_data['Site_ID'] == site) & (ameriflux_site_data['Variable'] == 'TA_1_1_1')].empty:
+            z_r = np.nanmedian(ameriflux_site_data.loc[ameriflux_site_data['Variable'] == 'TA_1_1_1']['Height'])
+        else:
+            z_r = ameriflux_site_data.loc[(ameriflux_site_data['Site_ID'] == site) & (ameriflux_site_data['Variable'] == 'TA_1_1_1')]['Height']
+        print(z_r)
+        # Site-specific data
+        site_fpath = glob.glob('goes_air_temperature/elevation_data/' + site + '*.csv')[0]
+        crd = [float(site_fpath.split('_')[-3]), float(site_fpath.split('_')[-2])]
     else:
-        z_r = ameriflux_site_data.loc[(ameriflux_site_data['Site_ID'] == site) & (ameriflux_site_data['Variable'] == 'TA_1_1_1')]['Height']
-    print(z_r)
-    # Site-specific data
-    site_fpath = glob.glob('goes_air_temperature/elevation_data/' + site + '*.csv')[0]
-    crd = [float(site_fpath.split('_')[-3]), float(site_fpath.split('_')[-2])]
-    
-    # Non-iterative quantities    
-    bbox = g16.site_info(crd)
-    goes_grid_info = g16.goes_grid(bbox)    
-    nlcd_grid_info = g16.nlcd_grid(crd)
-    h_0 = g16.roughness_height_grid(crd)
+        crd = [0, 0]
     
     p_air = 1013.25 # Air pressure, MSLP
     # Define location dictionary with site-specific properties
@@ -66,7 +63,13 @@ def main(start_date, end_date, site):
                  'MANH': [[40.7678, -73.9645], 94.8],
                  'QUEE': [[40.7366, -73.8201], 54.6],
                  'STAT': [[40.6021, -74.1504], 33.1],
-                 site: [crd, 5]}
+                 'US-xNQ': [crd, 5]}
+    
+    # Non-iterative quantities    
+    bbox = g16.site_info(site_info[site][0])
+    goes_grid_info = g16.goes_grid(bbox)    
+    nlcd_grid_info = g16.nlcd_grid(site_info[site][0])
+    h_0 = g16.roughness_height_grid(site_info[site][0])
     
     # Specify date range of interest
     # Format: YYYYMMDDHHMM
@@ -92,11 +95,12 @@ def main(start_date, end_date, site):
     # Access and process data from ASOS FTP for given dates
     asos_data = asos.data_read(start_date, end_date, site_info[site][0])
     agg_df['u_r'] = asos_data['u_r']
-    agg_df = agg_df[:-1] # Cut off last row to remove hanging timestamp (midnight on next day)
     
     # Pull Mesonet data and assign to 'q_h_obs' column in aggregate DataFrame
     if site[0:2] != 'US':
         mesonet_data = meso.csv_reader(start_date, end_date, ("mesonet_data/" + site))
+        print(agg_df)
+        print(mesonet_data['H'][::2].tolist())
         agg_df['q_h_obs'] = mesonet_data['H'][::2].tolist()
         agg_df['u_star_obs'] = mesonet_data['USTAR'][::2].tolist()
         # agg_df['T_air'] = mesonet_data['T_air'][::2].tolist()
@@ -140,6 +144,27 @@ def main(start_date, end_date, site):
 
     ## End iterative method
 
+### Run algorithm for selected dates
 runtime = time.time()
-model_data = main(201903060000, 201903090000, 'US-ONA') 
+
+## Single run
+# model_data = main(202006010000, 202006040000, 'BKLN')
+
+## Multiple runs
+station_list = ['STAT']
+
+# Read in GOES-16 Clear Day Log, where dates with continuous clear days are recorded
+rundates = pd.read_csv('goes_air_temperature/aux/goes-16_clear_day_log.csv', header=3, usecols=['Dates of Interest'])
+# Remove intermediate dates or blank rows
+rundates = rundates[rundates['Dates of Interest'].str.len() > 1]
+# Reformat date entries to match desired input formats
+rundates = rundates["Dates of Interest"].tolist()
+rundates = [int(s.replace('/', '') + '0000') for s in rundates]
+rundates = np.reshape(rundates, (int(len(rundates)/2), 2))
+# For each pair of dates in the 'rundates' matrix, run the algorithm for each station
+for station in station_list:
+    # Run 0-22, 23 onwards
+    for i in range(0, 21):
+        model_data = main(rundates[i][0], rundates[i][1], station)
+
 print('Program runtime: %.4f s' % (time.time()-runtime))

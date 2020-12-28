@@ -18,8 +18,10 @@ def CtoK(T):
     return T + 273.15
 
 def csv_reader(start_date, end_date, data_dir):
+
+    [start_date, end_date] = [start_date.strftime('%Y%m%d'), end_date.strftime('%Y%m%d')]
     
-    data_cols = [2, 23, 29, 46] # Datetime, sensible heat flux, friction velocity, air temperature
+    data_cols = ['datetime', 'H', 'USTAR', 'Tc'] # Datetime, sensible heat flux, friction velocity, air temperature
     
     # Initialize empty array to hold file data
     data_list = []
@@ -27,8 +29,8 @@ def csv_reader(start_date, end_date, data_dir):
     # Sort files by date, assuming standard Mesonet filename convention
     # Example: YYYYMMDD_PARAMETER_LOCATION_Parameter_NYSMesonet.csv
     file_list = sorted(os.listdir(data_dir), key=file_sort)
-    start_date = int(str(start_date)[0:-4])
-    end_date = int(str(end_date)[0:-4])-1
+    start_date = int(start_date)
+    end_date = int(end_date)
     
     # Specify date range of interest
     # Format: YYYYMMDDHHMM
@@ -39,10 +41,11 @@ def csv_reader(start_date, end_date, data_dir):
     date_range = [t.to_pydatetime() for t in date_range]
     
     # Iterate through sorted file list and extract data within date range
-    for file in file_list:        
+    for file in file_list:       
         if start_date <= int(os.path.splitext(file)[0][0:8]) <= end_date:
             # print(os.path.splitext(file)[0][0:8])
             filename = data_dir + "/" + file
+            print(filename)
             data_list.append(pd.read_csv(filename, usecols=data_cols))
             
     # Concatenate all dataframes in data_list
@@ -74,7 +77,7 @@ def csv_reader(start_date, end_date, data_dir):
     data['Tc'] = data['Tc'].astype(float)
     data['Tc'] = [CtoK(i) for i in data['Tc']]
     data.rename(columns = {'Tc':'T_air'}, inplace = True) 
-
+    
     return data
         
 def main(start_date, end_date, data_dir):
