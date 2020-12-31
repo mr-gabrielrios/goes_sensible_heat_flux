@@ -2,6 +2,11 @@
 
 The objective of this script is to provide an algorithm for calculating the sensible heat flux (Q_h) using GOES satellite data as a base input, processed through [Josh Hrisko's](https://github.com/makerportal) product for land surface temperature (LST) and air temperature at a height of 2m from the elevation of the reference location.
 
+## Sample Outputs
+
+- New York, 07/28/2019 @ 12:00 to 23:59 UTC
+![Ah damn it, this didn't work, huh?'](https://github.com/mr-gabrielrios/goes_sensible_heat_flux/blob/main/plots/q_h20190728NYC.gif)
+
 ## Technical notes
 The algorithm in this script is loosely based on Launiainen et al. (1995) ([link to publication](https://www.sciencedirect.com/science/article/pii/026698389090021W)). Note that Kim et al. (2019) ([link to publication](https://doi.org/10.3390/atmos10070363)) used a simpler implementation of this algorithm. Convergence has been shown for both unstable and stable atmospheric conditions (`&zeta; < 0, &zeta; > 0, &zeta; = 0`).
 
