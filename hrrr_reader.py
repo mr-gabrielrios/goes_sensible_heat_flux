@@ -120,9 +120,10 @@ def main(date, lat, lon):
     start_time = time.time() # Start program timer
     
     ### Define location and time of interest
-    bound_sz = 5 # Window size outward from central point, in degrees
+    bound_sz = 2 # Window size outward from central point, in degrees
     date = datetime.strptime(date, '%Y%m%d%H%M')
     
+    hrrr_data_download(date)
     hrrr_file = hrrr_data_access(date)
     lats, lons, hrrr_vals, hrrr_data_time = hrrr_data_processing(hrrr_file, lat, lon, bound_sz)
     hrrr_plot(lats, lons, hrrr_vals, hrrr_data_time, lat, lon, bound_sz)
@@ -131,4 +132,4 @@ def main(date, lat, lon):
     print('Program runtime: %.3f s' % end_time)
     
 # Call function with date (YYYYMMDDHHMM format), latitude, longitude (degrees E)
-main('201907281700', 40.631762, -73.953678)
+main('201907281800', 40.631762, -73.953678)
