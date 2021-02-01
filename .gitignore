@@ -1,0 +1,13 @@
+*.com
+*.dll
+*.exe
+*.o
+*.zip
+*.rar
+*.tar
+*.7z
+nlcd_to_goes_upscaled.csv
+*.pyc
+*.grib2
+*Mesonet.csv
+*elevation.csv

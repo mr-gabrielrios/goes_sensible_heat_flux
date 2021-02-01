@@ -1,0 +1,1 @@
+''' Package for estimating the sensible heat flux over a spatial and temporal range. '''

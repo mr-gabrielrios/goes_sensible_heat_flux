@@ -1,0 +1,5 @@
+Site,Latitude,Longitude,Path,Start Date,End Date
+BKLN, 40.631762, -73.953678, vdtn/obs/mesonet/data/BKLN, 2019-06-01 00:00:00, 2020-05-31 23:59:59
+QUEE, 40.734335, -73.815856, vdtn/obs/mesonet/data/QUEE, 2019-06-01 00:00:00, 2020-05-31 23:59:59
+STAT, 40.604014, -74.148499, vdtn/obs/mesonet/data/STAT, 2019-06-01 00:00:00, 2020-05-31 23:59:59
+

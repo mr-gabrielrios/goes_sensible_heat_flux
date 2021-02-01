@@ -1,0 +1,21 @@
+CLASS,NAME,ZR,SOURCE,NOTES
+11,Open Water,0,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 117
+12,Perennial Ice/Snow,0,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 118
+21,"Developed, Open Space",2.5,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,EXTRAPOLATION
+22,"Developed, Low Intensity",5,https://github.com/wrf-model/WRF/blob/master/run/URBPARM.TBL,LINE 24
+23,"Developed, Medium Intensity",7.5,https://github.com/wrf-model/WRF/blob/master/run/URBPARM.TBL,LINE 24
+24,"Developed, High Intensity",10,https://github.com/wrf-model/WRF/blob/master/run/URBPARM.TBL,LINE 24
+31,Barren Land (Rock/Sand/Clay),0.01,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 123
+41,Deciduous Forest,11.5,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 124
+42,Evergreen Forest,8.5,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 125
+43,Mixed Forest,10,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 126
+51,Dwarf Scrub,0.1,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 127
+52,Shrub/Scrub,0.1,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 128
+71,Grassland/Herbaceous,0.1,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 129
+72,Sedge/Herbaceous,0.1,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 130
+73,Lichens,0,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 131
+74,Moss,0,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 132
+81,Pasture/Hay,0.1,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 133
+82,Cultivated Crops,0.1,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 134
+90,Woody Wetlands,11.5,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 135
+95,Emergent Herbaceous Wetlands,0.1,https://github.com/wrf-model/WRF/blob/master/run/VEGPARM.TBL,LINE 136
